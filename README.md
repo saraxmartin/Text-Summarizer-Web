@@ -1,2 +1,2 @@
-# Text-Summarizer
-Text Summarizer project using Transformers
+# Text-Summarizer-Web
+Text Summarizer website
