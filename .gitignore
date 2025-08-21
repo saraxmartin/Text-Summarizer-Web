@@ -1,0 +1,14 @@
+# Python venv
+.venv/
+
+# Python cache
+__pycache__/
+
+# VSCode
+.vscode/
+
+# Node.js (frontend)
+node_modules/
+
+# Logs
+*.log
