@@ -1,33 +1,40 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-from transformers import PegasusTokenizer, PegasusForConditionalGeneration
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import requests
+import os
 
 app = FastAPI()
 
-# Allow React frontend to call this API
+origins = [
+    "http://localhost:5173",  # your Vite frontend
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
-    allow_methods=["*"],
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],    # allow POST, OPTIONS, etc.
     allow_headers=["*"],
 )
 
-# Load PEGASUS model
-model_name = "google/pegasus-xsum"
-tokenizer = PegasusTokenizer.from_pretrained(model_name)
-model = PegasusForConditionalGeneration.from_pretrained(model_name)
+HF_API_URL = "https://api-inference.huggingface.co/models/google/pegasus-xsum"
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+if not HF_API_TOKEN:
+    raise ValueError("Set HF_API_TOKEN in your environment")
+HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
 
 class TextRequest(BaseModel):
     text: str
 
 @app.post("/summarize")
-def summarize_text(req: TextRequest):
-    inputs = tokenizer(req.text, truncation=True, padding="longest", return_tensors="pt")
-    summary_ids = model.generate(**inputs, max_length=60, min_length=20, length_penalty=2.0, num_beams=4)
-    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    return {"summary": summary}
+def summarize(request: TextRequest):
+    payload = {"inputs": request.text}
+    response = requests.post(HF_API_URL, headers=HEADERS, json=payload)
+    data = response.json()
+    # Hugging Face returns a list of dicts with 'summary_text'
+    if isinstance(data, list) and "summary_text" in data[0]:
+        return {"summary": data[0]["summary_text"]}
+    else:
+        return {"error": data}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
